@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Chameleon — upright profile</title>
+  <desc id="desc">A soft two-tone chameleon inspired by the supplied upright pose, with a broad left-facing head, raised casque, large turret eye, folded limbs, curved body and hanging spiral tail.</desc>
+  <!-- Editable palette: ivory #F1EDE2; forest #40574D. -->
+  <rect id="background" width="128" height="128" rx="26" fill="#F1EDE2"/>
+  <g id="chameleon" transform="translate(0 -2)">
+    <g id="silhouette" fill="#40574D">
+      <path id="spiral-tail" d="M91 70 C105 89 96 111 79 113 C62 116 53 103 58 92 C62 83 75 81 81 89 C88 98 77 108 70 101 C65 96 69 90 73 93" fill="none" stroke="#40574D" stroke-width="7.5" stroke-linecap="round"/>
+      <path id="head-and-body" d="M20 43 Q17 41 22 37 L33 29 Q42 23 51 27 L59 23 Q63 21 65 25 C81 27 94 45 98 65 Q100 74 98 83 L84 86 C77 76 71 69 62 64 L46 57 C33 57 23 53 20 47 Z"/>
+      <path id="front-leg" d="M58 53 Q72 51 68 61 L53 75 L49 75" fill="none" stroke="#40574D" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path id="rear-leg" d="M86 78 L82 70 Q78 62 73 69 L66 80 L60 83" fill="none" stroke="#40574D" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="details" fill="none" stroke="#F1EDE2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle id="turret-eye" cx="39" cy="37.5" r="8"/>
+      <circle id="eye-center" cx="37.5" cy="37.5" r="2.4" fill="#F1EDE2" stroke="none"/>
+      <path id="closed-mouth" d="M20 45 H41"/>
+      <path id="neck-contour" d="M56 32 C61 40 57 48 54 52"/>
+      <path id="front-leg-fold" d="M58 53 Q71 52 67 60 L55 71"/>
+      <path id="rear-leg-fold" d="M86 77 L82 70 Q78 63 73 70 L68 78"/>
+      <path id="upper-body-marking" d="M70 34 Q78 37 82 45"/>
+      <path id="lower-body-marking" d="M79 48 Q85 51 88 58"/>
+    </g>
+  </g>
+</svg>
