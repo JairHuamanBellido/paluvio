@@ -19,6 +19,8 @@ pub fn app_layout(
             div()
                 .flex()
                 .flex_1()
+                .min_h_0()
+                .min_w_0()
                 .overflow_hidden()
                 .child(sidebar)
                 .child(content),

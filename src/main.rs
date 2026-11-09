@@ -12,6 +12,7 @@ fn main() {
             gpui_kit::init(cx);
 
             let options = WindowOptions {
+                window_min_size: Some(size(px(800.), px(500.))),
                 titlebar: Some(TitlebarOptions {
                     // Center native traffic lights inside the 48px header.
                     traffic_light_position: Some(point(px(9.), px(17.))),
