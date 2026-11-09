@@ -1,5 +1,5 @@
 use gpui_kit::{
-    component::{ActiveTheme, Theme, ThemeMode, button::Button},
+    component::{ActiveTheme, Theme, ThemeMode},
     *,
 };
 
@@ -8,22 +8,24 @@ use super::{
     sidebar::color_sidebar,
     variable_swatch::variable_swatch,
 };
-use crate::theme::{self, ColorRole, PaletteState};
+use crate::theme::{self, COLOR_GROUP, ColorRole, PaletteState};
 
 pub struct MainView {
     palette: PaletteState,
     editors: Vec<(ColorRole, Entity<ColorEditor>)>,
-    copied: bool,
     _subscriptions: Vec<Subscription>,
 }
 
 impl MainView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let palette = PaletteState::new();
+
         Theme::change(ThemeMode::Light, Some(window), cx);
         theme::apply(&palette, cx);
-        let mut editors = Vec::new();
+
+        let mut editors: Vec<(ColorRole, Entity<ColorEditor>)> = Vec::new();
         let mut subscriptions = Vec::new();
+
         for role in ColorRole::ALL {
             let editor =
                 cx.new(|cx| ColorEditor::new(role, palette.variable(role).value, window, cx));
@@ -40,7 +42,6 @@ impl MainView {
                         let value = this.palette.variable(*role).value;
                         editor.update(cx, |editor, cx| editor.set_value(value, window, cx));
                     }
-                    this.copied = false;
                     theme::apply(&this.palette, cx);
                     cx.notify();
                 },
@@ -50,7 +51,6 @@ impl MainView {
         Self {
             palette,
             editors,
-            copied: false,
             _subscriptions: subscriptions,
         }
     }
@@ -58,32 +58,46 @@ impl MainView {
 
 impl Render for MainView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let rows = self
-            .editors
+        let sections = COLOR_GROUP
             .iter()
-            .map(|(role, editor)| {
-                variable_swatch(self.palette.variable(*role), editor.clone(), cx).into_any_element()
+            .map(|group| {
+                let swatch_colors_rows = group.roles.iter().map(|role| {
+                    let (_, editor) = self
+                        .editors
+                        .iter()
+                        .find(|(editor_role, _)| editor_role == role)
+                        .expect("registered color editor");
+
+                    variable_swatch(self.palette.variable(*role), editor.clone(), cx)
+                        .into_any_element()
+                });
+
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .child(
+                        div()
+                            .px_3()
+                            .text_xs()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(cx.theme().muted_foreground)
+                            .child(group.name),
+                    )
+                    .child(div().flex().flex_col().gap_1().children(swatch_colors_rows))
+                    .into_any_element()
             })
             .collect::<Vec<_>>();
-        let export = Button::new("copy-palette")
-            .label(if self.copied {
-                "Palette copied"
-            } else {
-                "Copy palette"
-            })
-            .on_click(cx.listener(|this, _, _, cx| {
-                cx.write_to_clipboard(ClipboardItem::new_string(this.palette.export()));
-                this.copied = true;
-                cx.notify();
-            }));
+
         let primary = self.palette.variable(ColorRole::Primary).value.to_color();
         div()
             .font_family("Manrope")
             .font_weight(FontWeight::NORMAL)
             .size_full()
+            .bg(rgb(0xffffff))
             .flex()
             .overflow_hidden()
-            .child(color_sidebar(rows, export, cx))
+            .child(color_sidebar(sections, cx))
             .child(
                 div()
                     .id("palette-preview")

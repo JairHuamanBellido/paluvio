@@ -1,10 +1,14 @@
 mod color;
+mod group;
 mod palette;
+mod role;
 mod variables;
 
 pub use color::Hsv;
+pub use group::COLOR_GROUP;
 pub use palette::PaletteRecipe;
-pub use variables::{ColorRole, ColorVariable, PaletteState};
+pub use role::ColorRole;
+pub use variables::{ColorVariable, PaletteState};
 
 use gpui_kit::{App, component::Theme};
 
