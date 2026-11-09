@@ -1,9 +1,9 @@
-use gpui_kit::{component::ActiveTheme, *};
+use gpui_kit::*;
 
 pub fn color_sidebar(
     rows: impl IntoIterator<Item = AnyElement>,
     footer: impl IntoElement,
-    cx: &App,
+    _: &App,
 ) -> impl IntoElement {
     div()
         .id("color-sidebar")
@@ -14,10 +14,7 @@ pub fn color_sidebar(
         .flex_shrink_0()
         .overflow_y_scroll()
         .p_4()
-        .bg(cx.theme().sidebar)
-        .text_color(cx.theme().sidebar_foreground)
         .border_r_1()
-        .border_color(cx.theme().sidebar_border)
         .flex()
         .flex_col()
         .gap_5()
@@ -27,17 +24,6 @@ pub fn color_sidebar(
                 .font_weight(FontWeight::BOLD)
                 .child("Paluvio"),
         )
-        .child(
-            div()
-                .rounded_lg()
-                .border_1()
-                .border_color(cx.theme().sidebar_border)
-                .p_4()
-                .flex()
-                .flex_col()
-                .gap_5()
-                .child(div().font_weight(FontWeight::SEMIBOLD).child("Colors"))
-                .children(rows),
-        )
+        .child(div().flex().flex_col().gap_1().children(rows))
         .child(footer)
 }

@@ -1,5 +1,9 @@
 use gpui_kit::{
-    component::{ActiveTheme, button::Button, popover::Popover},
+    component::{
+        ActiveTheme,
+        button::{Button, ButtonCustomVariant, ButtonVariants},
+        popover::Popover,
+    },
     *,
 };
 
@@ -12,34 +16,44 @@ pub fn variable_swatch(
     cx: &App,
 ) -> impl IntoElement {
     let color = variable.value.to_color();
-    div()
-        .flex()
-        .flex_col()
-        .gap_2()
-        .child(variable.role.name())
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(
-                    Popover::new(("color-popup", editor.entity_id()))
-                        .anchor(Anchor::TopLeft)
-                        .p_3()
-                        .trigger(
-                            Button::new(("edit-color", editor.entity_id()))
-                                .accessibility_label(format!("Edit {} color", variable.role.name()))
-                                .w(px(28.))
-                                .h(px(28.))
-                                .p_0()
-                                .rounded_md()
-                                .bg(color)
-                                .border_1()
-                                .border_color(cx.theme().border)
-                                .child(div().size_full().rounded_md().bg(color)),
-                        )
-                        .child(editor),
-                )
-                .child(div().text_sm().child(variable.value.to_hex())),
-        )
+    let row_style = ButtonCustomVariant::new(cx)
+        .foreground(cx.theme().sidebar_foreground)
+        .hover(rgb(0xffffff).into())
+        .active(rgb(0xffffff).into());
+    div().w_full().child(
+        Popover::new(("color-popup", editor.entity_id()))
+            .w_full()
+            .anchor(Anchor::TopLeft)
+            .p_3()
+            .trigger(
+                Button::new(("edit-color", editor.entity_id()))
+                    .accessibility_label(format!("Edit {} color", variable.role.name()))
+                    .custom(row_style)
+                    .w_full()
+                    .h_auto()
+                    .p_2()
+                    .rounded_lg()
+                    .cursor_pointer()
+                    .child(
+                        div()
+                            .w_full()
+                            .min_w_0()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .text_sm()
+                            .child(
+                                div()
+                                    .size(px(20.))
+                                    .flex_shrink_0()
+                                    .rounded_md()
+                                    .bg(color)
+                                    .border_1()
+                                    .border_color(cx.theme().border),
+                            )
+                            .child(div().min_w_0().text_ellipsis().child(variable.role.name())),
+                    ),
+            )
+            .child(editor),
+    )
 }
