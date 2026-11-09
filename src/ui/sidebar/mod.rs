@@ -1,10 +1,6 @@
 use gpui_kit::*;
 
-pub fn color_sidebar(
-    rows: impl IntoIterator<Item = AnyElement>,
-    footer: impl IntoElement,
-    _: &App,
-) -> impl IntoElement {
+pub fn color_sidebar(sections: impl IntoIterator<Item = AnyElement>, _: &App) -> impl IntoElement {
     div()
         .id("color-sidebar")
         .w(px(300.))
@@ -13,8 +9,7 @@ pub fn color_sidebar(
         .h_full()
         .flex_shrink_0()
         .overflow_y_scroll()
-        .p_4()
-        .border_r_1()
+        .px_3()
         .flex()
         .flex_col()
         .gap_5()
@@ -24,6 +19,5 @@ pub fn color_sidebar(
                 .font_weight(FontWeight::BOLD)
                 .child("Paluvio"),
         )
-        .child(div().flex().flex_col().gap_1().children(rows))
-        .child(footer)
+        .child(div().flex().flex_col().gap_4().children(sections))
 }

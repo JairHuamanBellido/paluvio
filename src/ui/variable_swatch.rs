@@ -10,6 +10,32 @@ use gpui_kit::{
 use super::color_editor::ColorEditor;
 use crate::theme::ColorVariable;
 
+fn swatch_dot(color: Hsla, border: Hsla) -> Div {
+    div()
+        .size(px(16.))
+        .flex_shrink_0()
+        .rounded_full()
+        .bg(color)
+        .border_1()
+        .border_color(border)
+}
+
+fn swatch_label(name: &'static str) -> Div {
+    div().min_w_0().text_ellipsis().child(name)
+}
+
+fn swatch_row(color: Hsla, name: &'static str, border: Hsla) -> Div {
+    div()
+        .w_full()
+        .min_w_0()
+        .flex()
+        .items_center()
+        .gap_3()
+        .text_sm()
+        .child(swatch_dot(color, border))
+        .child(swatch_label(name))
+}
+
 pub fn variable_swatch(
     variable: &ColorVariable,
     editor: Entity<ColorEditor>,
@@ -31,28 +57,11 @@ pub fn variable_swatch(
                     .custom(row_style)
                     .w_full()
                     .h_auto()
-                    .p_2()
+                    .px_3()
+                    .py_2()
                     .rounded_lg()
                     .cursor_pointer()
-                    .child(
-                        div()
-                            .w_full()
-                            .min_w_0()
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .text_sm()
-                            .child(
-                                div()
-                                    .size(px(20.))
-                                    .flex_shrink_0()
-                                    .rounded_md()
-                                    .bg(color)
-                                    .border_1()
-                                    .border_color(cx.theme().border),
-                            )
-                            .child(div().min_w_0().text_ellipsis().child(variable.role.name())),
-                    ),
+                    .child(swatch_row(color, variable.role.name(), cx.theme().border)),
             )
             .child(editor),
     )
