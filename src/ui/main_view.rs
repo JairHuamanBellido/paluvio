@@ -1,14 +1,16 @@
 use gpui_kit::{
-    component::{ActiveTheme, Theme, ThemeMode},
+    component::{Theme, ThemeMode},
     *,
 };
 
 use super::{
     color_editor::{ColorEditor, ColorEditorEvent},
-    sidebar::color_sidebar,
-    variable_swatch::variable_swatch,
+    sidebar::app_sidebar,
 };
-use crate::theme::{self, COLOR_GROUP, ColorRole, PaletteState};
+use crate::{
+    theme::{self, ColorRole, PaletteState},
+    ui::{header::app_header, layout::app_layout, main_content::main_content},
+};
 
 pub struct MainView {
     palette: PaletteState,
@@ -57,77 +59,12 @@ impl MainView {
 }
 
 impl Render for MainView {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let sections = COLOR_GROUP
-            .iter()
-            .map(|group| {
-                let swatch_colors_rows = group.roles.iter().map(|role| {
-                    let (_, editor) = self
-                        .editors
-                        .iter()
-                        .find(|(editor_role, _)| editor_role == role)
-                        .expect("registered color editor");
-
-                    variable_swatch(self.palette.variable(*role), editor.clone(), cx)
-                        .into_any_element()
-                });
-
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .child(
-                        div()
-                            .px_3()
-                            .text_xs()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(cx.theme().muted_foreground)
-                            .child(group.name),
-                    )
-                    .child(div().flex().flex_col().gap_1().children(swatch_colors_rows))
-                    .into_any_element()
-            })
-            .collect::<Vec<_>>();
-
-        let primary = self.palette.variable(ColorRole::Primary).value.to_color();
-        div()
-            .font_family("Manrope")
-            .font_weight(FontWeight::NORMAL)
-            .size_full()
-            .bg(rgb(0xffffff))
-            .flex()
-            .overflow_hidden()
-            .child(color_sidebar(sections, cx))
-            .child(
-                div()
-                    .id("palette-preview")
-                    .flex_1()
-                    .min_w_0()
-                    .h_full()
-                    .overflow_y_scroll()
-                    .bg(cx.theme().background)
-                    .text_color(cx.theme().foreground)
-                    .p_8()
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_6()
-                            .child(div().text_sm().child("Palette preview"))
-                            .child(
-                                div()
-                                    .text_3xl()
-                                    .font_weight(FontWeight::BOLD)
-                                    .child("Make it yours."),
-                            )
-                            .child("Select a color in the sidebar to update your palette.")
-                            .child(div().h(px(8.)).w(px(80.)).rounded_full().bg(primary))
-                            .child(
-                                div()
-                                    .text_lg()
-                                    .child("Background and foreground update live."),
-                            ),
-                    ),
-            )
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        app_layout(
+            app_sidebar(&self.palette, &self.editors, cx),
+            main_content(window, cx),
+            app_header(),
+            cx,
+        )
     }
 }
