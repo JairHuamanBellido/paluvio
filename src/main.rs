@@ -1,4 +1,4 @@
-use gpui_kit::*;
+use gpui_kit::{component::TitleBar, *};
 
 mod theme;
 mod ui;
@@ -11,6 +11,14 @@ fn main() {
         .run(|cx| {
             gpui_kit::init(cx);
 
+            let options = WindowOptions {
+                titlebar: Some(TitlebarOptions {
+                    // Center native traffic lights inside the 48px header.
+                    traffic_light_position: Some(point(px(9.), px(17.))),
+                    ..TitleBar::title_bar_options()
+                }),
+                ..TitleBar::window_options()
+            };
             cx.text_system()
                 // Register separate faces: this backend does not select variable weights.
                 .add_fonts(
@@ -35,7 +43,7 @@ fn main() {
                     .collect(),
                 )
                 .expect("failed to load Manrope");
-            gpui_kit::open_window(WindowOptions::default(), cx, |window, cx| {
+            gpui_kit::open_window(options, cx, |window, cx| {
                 cx.new(|cx| MainView::new(window, cx))
             })
             .expect("failed to open Paluvio");
