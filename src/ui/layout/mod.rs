@@ -6,11 +6,17 @@ pub fn app_layout(
     header: impl IntoElement,
     cx: &App,
 ) -> impl IntoElement {
+    let is_dark_mode = cx.theme().is_dark();
+    let background_color = if is_dark_mode {
+        rgb(0x000000)
+    } else {
+        rgb(0xffffff)
+    };
     div()
         .size_full()
         .flex()
         .flex_col()
-        .bg(rgb(0xffffff))
+        .bg(background_color)
         .text_color(cx.theme().foreground)
         .font_family("Manrope")
         .font_weight(FontWeight::NORMAL)
