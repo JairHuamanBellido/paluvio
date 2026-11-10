@@ -8,8 +8,8 @@ pub fn main_content(_: &mut Window, cx: &App) -> impl IntoElement {
         .overflow_y_scroll()
         .bg(cx.theme().background)
         .text_color(cx.theme().foreground)
-        .mx_10()
-        .rounded(px(24.))
+        .rounded_tl(px(24.))
+        .rounded_bl(px(24.))
         .p_8()
         .child(
             div().flex().flex_col().gap_6().child(
