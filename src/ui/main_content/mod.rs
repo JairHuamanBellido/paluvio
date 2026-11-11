@@ -1,5 +1,10 @@
+mod showcase;
+
 use gpui_kit::{component::ActiveTheme, *};
-pub fn main_content(_: &mut Window, cx: &App) -> impl IntoElement {
+
+pub use showcase::Showcase;
+
+pub fn main_content(showcase: &Entity<Showcase>, cx: &App) -> impl IntoElement {
     div()
         .id("palette-preview")
         .flex_1()
@@ -11,12 +16,5 @@ pub fn main_content(_: &mut Window, cx: &App) -> impl IntoElement {
         .rounded_tl(px(24.))
         .rounded_bl(px(24.))
         .p_8()
-        .child(
-            div().flex().flex_col().gap_6().child(
-                div()
-                    .text_3xl()
-                    .font_weight(FontWeight::BOLD)
-                    .child("Welcome to Main Content!!"),
-            ),
-        )
+        .child(showcase.clone())
 }

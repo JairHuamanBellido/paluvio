@@ -3,7 +3,7 @@
  */
 
 /// Stable identity shared by the variable list, editors, and theme mapping.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ColorRole {
     Primary,
     Background,

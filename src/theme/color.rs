@@ -51,13 +51,39 @@ impl Hsv {
     }
 
     /// Round channels so displaying an entered hex color preserves its bytes.
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "channels are 0..=1, so the value fits u8; `as` saturates anyway"
+    )]
     pub fn to_hex(self) -> String {
         let color = Rgba::from(self.to_color());
+        let byte = |channel: f32| (channel * 255.).round() as u8;
         format!(
             "#{:02X}{:02X}{:02X}",
-            (color.r * 255.).round() as u8,
-            (color.g * 255.).round() as u8,
-            (color.b * 255.).round() as u8
+            byte(color.r),
+            byte(color.g),
+            byte(color.b)
         )
     }
+}
+
+/// WCAG relative luminance, 0 (black) to 1 (white).
+pub fn luminance(color: Hsla) -> f32 {
+    let rgb = Rgba::from(color);
+    let linear = |c: f32| {
+        if c <= 0.03928 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    };
+
+    0.2126 * linear(rgb.r) + 0.7152 * linear(rgb.g) + 0.0722 * linear(rgb.b)
+}
+
+/// WCAG contrast ratio between two colors, 1 to 21.
+pub fn contrast_ratio(a: Hsla, b: Hsla) -> f32 {
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
 }

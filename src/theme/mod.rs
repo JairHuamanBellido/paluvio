@@ -2,6 +2,7 @@ mod color;
 mod gpui_bridge;
 mod group;
 mod palette;
+mod recipe;
 mod role;
 mod state;
 

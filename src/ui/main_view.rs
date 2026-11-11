@@ -12,7 +12,7 @@ use crate::{
     ui::{
         header::Header,
         layout::app_layout,
-        main_content::main_content,
+        main_content::{Showcase, main_content},
         toolbar::{ThemeModeSelector, ThemePreference, toolbar},
     },
 };
@@ -22,6 +22,7 @@ pub struct MainView {
     editors: Vec<(ColorRole, Entity<ColorEditor>)>,
     _subscriptions: Vec<Subscription>,
     theme_mode: Entity<ThemeModeSelector>,
+    showcase: Entity<Showcase>,
 }
 
 impl MainView {
@@ -81,8 +82,11 @@ impl MainView {
             }),
         );
 
+        let showcase = cx.new(|cx| Showcase::new(window, cx));
+
         Self {
             palette,
+            showcase,
             editors,
             _subscriptions: subscriptions,
             theme_mode,
@@ -115,11 +119,11 @@ impl MainView {
 }
 
 impl Render for MainView {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let header = Header::new(toolbar(&self.theme_mode));
         app_layout(
             app_sidebar(&self.palette, &self.editors, cx),
-            main_content(window, cx),
+            main_content(&self.showcase, cx),
             header,
             cx,
         )
