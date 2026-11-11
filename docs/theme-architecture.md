@@ -75,7 +75,7 @@ values derived from the recipe (see `adding-roles.md`).
   cleared and everything regenerates.
 - Switching mode clears all customizations. Overrides are not stored per mode yet.
 - `reset(role)` drops the customization and restores the generated value.
-  Primary resets to `#3b82f6`.
+  Primary resets to `#8CC671`.
 
 ## Known limits
 

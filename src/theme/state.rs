@@ -1,9 +1,9 @@
 use gpui_kit::{component::ThemeMode, rgb};
 
-use super::{ColorRole, Hsv, PaletteRecipe, gpui_bridge};
+use super::{ColorRole, Hsv, PaletteRecipe};
 
-/// Initial seed color (`#3b82f6`).
-const DEFAULT_PRIMARY: u32 = 0x3b82f6;
+/// Initial seed color (`#8CC671`).
+const DEFAULT_PRIMARY: u32 = 0x8CC671;
 
 /// One editable color: which role it is, its current value, and whether the
 /// user edited it by hand.
@@ -31,34 +31,25 @@ pub struct PaletteState {
 impl PaletteState {
     /// Creates the state for `mode`.
     ///
-    /// Primary starts as `#3b82f6`. Background and Foreground come from the
-    /// recipe. Every other role starts from the library defaults of `mode`.
+    /// Primary starts as `DEFAULT_PRIMARY`. Roles with a recipe rule are
+    /// generated. Every other role starts from the library defaults of `mode`.
     pub fn new(mode: ThemeMode) -> Self {
         let recipe = PaletteRecipe::default();
 
         let primary = Hsv::from_color(rgb(DEFAULT_PRIMARY).into());
         let generated = recipe.generate(primary.to_color(), mode);
-        let defaults = gpui_bridge::default_colors(mode);
         let variables = ColorRole::ALL
             .into_iter()
-            .map(|role| {
-                let color = match role {
-                    ColorRole::Primary => primary.to_color(),
-                    ColorRole::Background => generated.background,
-                    ColorRole::Foreground => generated.foreground,
-                    role => gpui_bridge::default_color(role, &defaults),
-                };
-                ColorVariable {
-                    role,
-                    value: Hsv::from_color(color),
-                    customized: false,
-                }
+            .map(|role| ColorVariable {
+                role,
+                value: Hsv::from_color(generated[&role]),
+                customized: false,
             })
             .collect();
         Self {
             recipe,
-            variables,
             mode,
+            variables,
         }
     }
 
@@ -73,16 +64,20 @@ impl PaletteState {
             .expect("registered color role")
     }
 
+    /// Mutable twin of [`variable`](Self::variable). Same panic guarantee.
+    fn variable_mut(&mut self, role: ColorRole) -> &mut ColorVariable {
+        self.variables
+            .iter_mut()
+            .find(|variable| variable.role == role)
+            .expect("registered color role")
+    }
+
     /// Applies a manual edit and marks the role as customized.
     ///
     /// Editing Primary also regenerates everything else, because the seed hue
     /// changed (all other customizations are cleared).
     pub fn set(&mut self, role: ColorRole, value: Hsv) {
-        let variable = self
-            .variables
-            .iter_mut()
-            .find(|variable| variable.role == role)
-            .expect("registered color role");
+        let variable = self.variable_mut(role);
         variable.value = Hsv::new(value.hue, value.saturation, value.brightness);
         variable.customized = true;
         if role == ColorRole::Primary {
@@ -92,13 +87,9 @@ impl PaletteState {
 
     /// Drops the manual edit of `role` and restores its generated value.
     ///
-    /// Primary has no generated value, so it goes back to `#3b82f6`.
+    /// Primary has no generated value, so it goes back to `DEFAULT_PRIMARY`.
     pub fn reset(&mut self, role: ColorRole) {
-        let variable = self
-            .variables
-            .iter_mut()
-            .find(|variable| variable.role == role)
-            .expect("registered color role");
+        let variable = self.variable_mut(role);
         variable.customized = false;
         if role == ColorRole::Primary {
             variable.value = Hsv::from_color(rgb(DEFAULT_PRIMARY).into());
@@ -120,7 +111,7 @@ impl PaletteState {
         self.mode = mode;
 
         for variable in &mut self.variables {
-            variable.customized = false
+            variable.customized = false;
         }
 
         self.regenerate();
@@ -139,27 +130,21 @@ impl PaletteState {
 
     /// Recomputes every non-customized variable for the current mode.
     ///
-    /// Primary is the seed and never regenerated. Background and Foreground
-    /// come from the recipe. Everything else uses the mode defaults. To drive
-    /// another role from the recipe, add an arm before the fallback.
+    /// Primary is the seed and never regenerated. Every other value is read
+    /// from [`PaletteRecipe::generate`], which already resolves rule-driven
+    /// roles and library-default fallbacks. To drive another role, add a rule
+    /// in `recipe/light.rs` / `recipe/dark.rs`.
     fn regenerate(&mut self) {
         let generated = self.recipe.generate(
             self.variable(ColorRole::Primary).value.to_color(),
             self.mode,
         );
 
-        let defaults = gpui_bridge::default_colors(self.mode);
         for variable in &mut self.variables {
-            if variable.customized {
+            if variable.customized || variable.role == ColorRole::Primary {
                 continue;
             }
-            let color = match variable.role {
-                ColorRole::Primary => continue,
-                ColorRole::Background => generated.background,
-                ColorRole::Foreground => generated.foreground,
-                role => gpui_bridge::default_color(role, &defaults),
-            };
-            variable.value = Hsv::from_color(color);
+            variable.value = Hsv::from_color(generated[&variable.role]);
         }
     }
 }
