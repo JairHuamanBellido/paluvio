@@ -9,10 +9,11 @@ variables in the sidebar.
 | File | Responsibility |
 | --- | --- |
 | `src/theme/palette.rs` | `PaletteRecipe`: saturation/brightness anchors per mode. `generate(seed, mode)` turns them into colors. |
-| `src/theme/variables.rs` | `PaletteState`: one `ColorVariable` per `ColorRole`. Regenerates on seed or mode change. |
-| `src/theme/role.rs` | `ColorRole`: enum of the 139 roles. |
+| `src/theme/state.rs` | `PaletteState`: one `ColorVariable` per `ColorRole`. Regenerates on seed or mode change. |
+| `src/theme/role.rs` | `ColorRole`: enum of the 139 roles. `role/label.rs` holds `name()` (UI labels), `role/key.rs` holds `key()` (export keys). |
 | `src/theme/color.rs` | `Hsv`: HSV color type and conversions. |
-| `src/theme/mod.rs` | Re-exports, plus `apply()` which writes colors into the live gpui theme. |
+| `src/theme/gpui_bridge.rs` | gpui-component boundary: `apply()` writes colors into the live theme, `default_color(s)` reads library defaults per role. |
+| `src/theme/mod.rs` | Module declarations and re-exports only. |
 | `src/ui/main_view.rs` | Listens to system appearance and the Light/Dark/System toggle, keeps palette in sync. |
 
 ## Core idea: recipe, not stored colors
