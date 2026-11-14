@@ -8,6 +8,7 @@ use super::{
     sidebar::app_sidebar,
 };
 use crate::{
+    preferences,
     theme::{self, ColorRole, PaletteState},
     ui::{
         header::Header,
@@ -27,7 +28,9 @@ pub struct MainView {
 
 impl MainView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        Theme::sync_system_appearance(Some(window), cx);
+        let saved_preference = preferences::load_theme_preference();
+        apply_theme_preference(saved_preference, window, cx);
+
         let palette = PaletteState::new(Theme::global(cx).mode);
         theme::apply(&palette, cx);
 
@@ -53,9 +56,7 @@ impl MainView {
         }
 
         let theme_mode: Entity<ThemeModeSelector> =
-            cx.new(|cx: &mut Context<'_, ThemeModeSelector>| {
-                ThemeModeSelector::new(super::toolbar::ThemePreference::System, cx)
-            });
+            cx.new(|cx| ThemeModeSelector::new(saved_preference, cx));
 
         subscriptions.push(cx.observe_window_appearance(window, |this, window, cx| {
             if this.theme_mode.read(cx).preference() == ThemePreference::System {
@@ -66,19 +67,14 @@ impl MainView {
 
         subscriptions.push(
             cx.subscribe_in(&theme_mode, window, |this, _, event, window, cx| {
-                match event.0 {
-                    ThemePreference::System => {
-                        Theme::sync_system_appearance(Some(window), cx);
-                    }
-                    ThemePreference::Light => {
-                        Theme::change(ThemeMode::Light, Some(window), cx);
-                    }
-                    ThemePreference::Dark => {
-                        Theme::change(ThemeMode::Dark, Some(window), cx);
-                    }
-                }
+                let preference = event.0;
+
+                apply_theme_preference(preference, window, cx);
 
                 this.sync_palette_mode(window, cx);
+                if let Err(error) = preferences::save_theme_preference(preference) {
+                    eprintln!("failed to save theme preference: {error}")
+                }
             }),
         );
 
@@ -127,5 +123,13 @@ impl Render for MainView {
             header,
             cx,
         )
+    }
+}
+
+fn apply_theme_preference(preference: ThemePreference, window: &mut Window, cx: &mut App) {
+    match preference {
+        ThemePreference::System => Theme::sync_system_appearance(Some(window), cx),
+        ThemePreference::Dark => Theme::change(ThemeMode::Dark, Some(window), cx),
+        ThemePreference::Light => Theme::change(ThemeMode::Light, Some(window), cx),
     }
 }

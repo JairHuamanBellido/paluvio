@@ -9,3 +9,4 @@ mod toolbar;
 mod variable_swatch;
 
 pub use main_view::MainView;
+pub use toolbar::ThemePreference;
