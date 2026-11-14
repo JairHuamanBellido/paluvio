@@ -1,5 +1,6 @@
 use gpui_kit::{component::TitleBar, *};
 
+mod preferences;
 mod theme;
 mod ui;
 

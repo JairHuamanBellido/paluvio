@@ -13,6 +13,29 @@ pub enum ThemePreference {
     System,
 }
 
+impl ThemePreference {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ThemePreference::Dark => "dark",
+            ThemePreference::Light => "light",
+            ThemePreference::System => "system",
+        }
+    }
+}
+
+impl std::str::FromStr for ThemePreference {
+    type Err = ();
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match text {
+            "light" => Ok(ThemePreference::Light),
+            "dark" => Ok(ThemePreference::Dark),
+            "system" => Ok(ThemePreference::System),
+            _ => Err(()),
+        }
+    }
+}
+
 pub struct ThemeModeSelector {
     preference: ThemePreference,
     focus_handle: FocusHandle,
@@ -159,5 +182,27 @@ impl Render for ThemeModeSelector {
                             )
                     }),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ThemePreference;
+
+    #[test]
+    fn round_trips_every_preference() {
+        for preference in [
+            ThemePreference::Light,
+            ThemePreference::Dark,
+            ThemePreference::System,
+        ] {
+            let parsed: ThemePreference = preference.as_str().parse().unwrap();
+            assert_eq!(parsed, preference);
+        }
+    }
+
+    #[test]
+    fn rejects_unknown_text() {
+        assert!("purple".parse::<ThemePreference>().is_err());
     }
 }
