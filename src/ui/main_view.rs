@@ -128,7 +128,17 @@ impl MainView {
 
 impl Render for MainView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let header = Header::new(toolbar(&self.theme_mode));
+        let (_, primary_editor) = self
+            .editors
+            .iter()
+            .find(|(role, _)| *role == ColorRole::Primary)
+            .expect("registered primary editor");
+        let header = Header::new(toolbar(
+            &self.theme_mode,
+            self.palette.variable(ColorRole::Primary).value,
+            primary_editor,
+            cx,
+        ));
         let query = self.search.read(cx).value();
         let clear_search = cx.listener(|this, _: &ClickEvent, window, cx| {
             // `set_value` emits no change event, so re-render by hand.
