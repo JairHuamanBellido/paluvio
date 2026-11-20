@@ -148,3 +148,57 @@ impl PaletteState {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const RED: Hsv = Hsv {
+        hue: 0.,
+        saturation: 0.8,
+        brightness: 0.9,
+    };
+
+    fn hover(palette: &PaletteState) -> Hsv {
+        palette.variable(ColorRole::ButtonPrimaryHover).value
+    }
+
+    #[test]
+    fn changing_primary_regenerates_dependent_roles() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        let before = hover(&palette);
+
+        palette.set(ColorRole::Primary, RED);
+
+        assert_eq!(palette.variable(ColorRole::Primary).value, RED);
+        assert_ne!(hover(&palette), before);
+    }
+
+    #[test]
+    fn changing_primary_clears_other_customizations() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set(ColorRole::ButtonPrimaryHover, Hsv::new(0.5, 0.5, 0.5));
+
+        palette.set(ColorRole::Primary, RED);
+
+        assert!(!palette.variable(ColorRole::ButtonPrimaryHover).customized);
+    }
+
+    #[test]
+    fn switching_mode_keeps_primary_and_regenerates() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set(ColorRole::Primary, RED);
+
+        palette.set_mode(ThemeMode::Dark);
+
+        let mut expected = PaletteState::new(ThemeMode::Dark);
+        expected.set(ColorRole::Primary, RED);
+        for role in ColorRole::ALL {
+            assert_eq!(
+                palette.variable(role).value,
+                expected.variable(role).value,
+                "{role:?}"
+            );
+        }
+    }
+}
