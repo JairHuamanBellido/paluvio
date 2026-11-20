@@ -1,11 +1,14 @@
 use gpui_kit::{
-    component::{Theme, ThemeMode},
+    component::{
+        Theme, ThemeMode,
+        input::{InputEvent, InputState},
+    },
     *,
 };
 
 use super::{
     color_editor::{ColorEditor, ColorEditorEvent},
-    sidebar::app_sidebar,
+    sidebar::{app_sidebar, search_bar},
 };
 use crate::{
     preferences,
@@ -24,6 +27,7 @@ pub struct MainView {
     _subscriptions: Vec<Subscription>,
     theme_mode: Entity<ThemeModeSelector>,
     showcase: Entity<Showcase>,
+    search: Entity<InputState>,
 }
 
 impl MainView {
@@ -80,9 +84,17 @@ impl MainView {
 
         let showcase = cx.new(|cx| Showcase::new(window, cx));
 
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search a color"));
+        subscriptions.push(cx.subscribe(&search, |_, _, event, cx| {
+            if matches!(event, InputEvent::Change) {
+                cx.notify();
+            }
+        }));
+
         Self {
             palette,
             showcase,
+            search,
             editors,
             _subscriptions: subscriptions,
             theme_mode,
@@ -117,8 +129,22 @@ impl MainView {
 impl Render for MainView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let header = Header::new(toolbar(&self.theme_mode));
+        let query = self.search.read(cx).value();
+        let clear_search = cx.listener(|this, _: &ClickEvent, window, cx| {
+            // `set_value` emits no change event, so re-render by hand.
+            this.search
+                .update(cx, |search, cx| search.set_value("", window, cx));
+            cx.notify();
+        });
         app_layout(
-            app_sidebar(&self.palette, &self.editors, cx),
+            app_sidebar(
+                &self.palette,
+                &self.editors,
+                search_bar(&self.search, cx),
+                query,
+                clear_search,
+                cx,
+            ),
             main_content(&self.showcase, cx),
             header,
             cx,

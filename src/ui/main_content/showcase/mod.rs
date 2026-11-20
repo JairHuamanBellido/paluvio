@@ -10,17 +10,6 @@
 //! 3. Stateful card: add an `Entity` field + build it in `Showcase::new`.
 //! 4. Add it to a `column_*` method below. List order = top to bottom.
 
-/// Loads a Phosphor icon embedded from `assets/`. Tint with `.text_color(..)`.
-macro_rules! icon {
-    ($file:literal) => {
-        gpui_kit::component::Icon::default().data(include_bytes!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/assets/",
-            $file
-        )))
-    };
-}
-
 mod card;
 mod cards;
 mod noise;
