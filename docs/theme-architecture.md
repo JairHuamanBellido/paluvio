@@ -71,14 +71,15 @@ values derived from the recipe (see `adding-roles.md`).
 ## Customization rules
 
 - Editing a role sets `customized = true`. Regeneration skips it.
-- Editing **Primary** changes the seed hue, so all other customizations are
-  cleared and everything regenerates.
-- Switching mode clears all customizations. Overrides are not stored per mode yet.
-- `reset(role)` drops the customization and restores the generated value.
-  Primary resets to `#8CC671`.
+- Edits are stored per mode. An edit made in Light stays in Light, an edit made
+  in Dark stays in Dark, and both survive switching modes.
+- **Primary** is the seed and is shared by both modes. Editing it changes the
+  seed hue, so the customizations of *both* modes are cleared and everything
+  regenerates.
+- `reset(role)` drops the customization of the active mode only and restores
+  the generated value. Primary resets to `#8CC671`.
 
 ## Known limits
 
 - `theme::apply` maps only Background and Foreground to the live theme.
-- Overrides are lost when the mode switches.
 - Primary has the same value in both modes.

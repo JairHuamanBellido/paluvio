@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use gpui_kit::{component::ThemeMode, rgb};
 
 use super::{ColorRole, Hsv, PaletteRecipe};
@@ -10,22 +12,30 @@ const DEFAULT_PRIMARY: u32 = 0x8CC671;
 pub struct ColorVariable {
     pub role: ColorRole,
     pub value: Hsv,
-    /// `true` after a manual edit. Customized variables are skipped by
-    /// `regenerate`, so the recipe never overwrites a user choice.
+    /// `true` after a manual edit in the active mode. Customized variables
+    /// are skipped by `regenerate`, so the recipe never overwrites a user
+    /// choice.
     pub customized: bool,
 }
 
 /// Source of truth for every color role shown in the editor.
 ///
-/// Holds one [`ColorVariable`] per [`ColorRole`], the recipe that generates
-/// them, and the active theme mode. The mode is *not* decided here: the UI
-/// reads it from `Theme::global(cx).mode` and pushes it in via [`set_mode`].
+/// Holds one [`ColorVariable`] per [`ColorRole`] for the active mode, the
+/// manual edits of each mode, the recipe that generates the rest, and the
+/// active theme mode. The mode is *not* decided here: the UI reads it from
+/// `Theme::global(cx).mode` and pushes it in via [`set_mode`].
+///
+/// Primary is the seed and is shared by both modes. Every other manual edit
+/// belongs to the mode it was made in, so switching modes keeps the edits of
+/// each one.
 ///
 /// [`set_mode`]: PaletteState::set_mode
 pub struct PaletteState {
     recipe: PaletteRecipe,
     mode: ThemeMode,
     variables: Vec<ColorVariable>,
+    /// Manual edits per mode, Primary excluded.
+    overrides: HashMap<ThemeMode, HashMap<ColorRole, Hsv>>,
 }
 
 impl PaletteState {
@@ -50,6 +60,7 @@ impl PaletteState {
             recipe,
             mode,
             variables,
+            overrides: HashMap::new(),
         }
     }
 
@@ -74,18 +85,26 @@ impl PaletteState {
 
     /// Applies a manual edit and marks the role as customized.
     ///
-    /// Editing Primary also regenerates everything else, because the seed hue
-    /// changed (all other customizations are cleared).
+    /// Non-Primary edits are stored for the active mode only. Editing Primary
+    /// regenerates everything else, because the seed hue changed: the
+    /// customizations of *both* modes are cleared.
     pub fn set(&mut self, role: ColorRole, value: Hsv) {
+        let value = Hsv::new(value.hue, value.saturation, value.brightness);
         let variable = self.variable_mut(role);
-        variable.value = Hsv::new(value.hue, value.saturation, value.brightness);
+        variable.value = value;
         variable.customized = true;
         if role == ColorRole::Primary {
             self.regenerate_from_primary();
+        } else {
+            self.overrides
+                .entry(self.mode)
+                .or_default()
+                .insert(role, value);
         }
     }
 
-    /// Drops the manual edit of `role` and restores its generated value.
+    /// Drops the manual edit of `role` in the active mode and restores its
+    /// generated value. The other mode keeps its own edit.
     ///
     /// Primary has no generated value, so it goes back to `DEFAULT_PRIMARY`.
     pub fn reset(&mut self, role: ColorRole) {
@@ -95,14 +114,17 @@ impl PaletteState {
             variable.value = Hsv::from_color(rgb(DEFAULT_PRIMARY).into());
             self.regenerate_from_primary();
         } else {
+            if let Some(overrides) = self.overrides.get_mut(&self.mode) {
+                overrides.remove(&role);
+            }
             self.regenerate();
         }
     }
 
-    /// Switches the active mode and regenerates all colors for it.
+    /// Switches the active mode and rebuilds every color for it.
     ///
-    /// No-op when the mode is unchanged. Manual edits are cleared, because
-    /// overrides are not stored per mode yet.
+    /// No-op when the mode is unchanged. Edits made earlier in `mode` are
+    /// restored; every other role is regenerated from the recipe.
     pub fn set_mode(&mut self, mode: ThemeMode) {
         if self.mode == mode {
             return;
@@ -110,16 +132,27 @@ impl PaletteState {
 
         self.mode = mode;
 
+        let overrides = self.overrides.get(&mode);
         for variable in &mut self.variables {
-            variable.customized = false;
+            if variable.role == ColorRole::Primary {
+                continue;
+            }
+            match overrides.and_then(|overrides| overrides.get(&variable.role)) {
+                Some(value) => {
+                    variable.value = *value;
+                    variable.customized = true;
+                }
+                None => variable.customized = false,
+            }
         }
 
         self.regenerate();
     }
 
-    /// Clears every customization except Primary, then regenerates.
-    /// Called when the seed hue changes.
+    /// Clears every customization except Primary, in both modes, then
+    /// regenerates. Called when the seed hue changes.
     fn regenerate_from_primary(&mut self) {
+        self.overrides.clear();
         for variable in &mut self.variables {
             if variable.role != ColorRole::Primary {
                 variable.customized = false;
@@ -200,5 +233,108 @@ mod tests {
                 "{role:?}"
             );
         }
+    }
+
+    const GREY: Hsv = Hsv {
+        hue: 0.5,
+        saturation: 0.5,
+        brightness: 0.5,
+    };
+
+    const BLUE: Hsv = Hsv {
+        hue: 0.6,
+        saturation: 0.7,
+        brightness: 0.8,
+    };
+
+    fn background(palette: &PaletteState) -> &ColorVariable {
+        palette.variable(ColorRole::Background)
+    }
+
+    fn generated(mode: ThemeMode, role: ColorRole) -> Hsv {
+        PaletteState::new(mode).variable(role).value
+    }
+
+    #[test]
+    fn light_edit_survives_round_trip() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set(ColorRole::Background, GREY);
+
+        palette.set_mode(ThemeMode::Dark);
+        palette.set_mode(ThemeMode::Light);
+
+        assert_eq!(background(&palette).value, GREY);
+        assert!(background(&palette).customized);
+    }
+
+    #[test]
+    fn dark_edit_survives_round_trip() {
+        let mut palette = PaletteState::new(ThemeMode::Dark);
+        palette.set(ColorRole::Background, GREY);
+
+        palette.set_mode(ThemeMode::Light);
+        palette.set_mode(ThemeMode::Dark);
+
+        assert_eq!(background(&palette).value, GREY);
+        assert!(background(&palette).customized);
+    }
+
+    #[test]
+    fn edits_do_not_leak_between_modes() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set(ColorRole::Background, GREY);
+
+        palette.set_mode(ThemeMode::Dark);
+
+        assert_eq!(
+            background(&palette).value,
+            generated(ThemeMode::Dark, ColorRole::Background)
+        );
+        assert!(!background(&palette).customized);
+
+        palette.set(ColorRole::Background, BLUE);
+        palette.set_mode(ThemeMode::Light);
+        assert_eq!(background(&palette).value, GREY);
+        palette.set_mode(ThemeMode::Dark);
+        assert_eq!(background(&palette).value, BLUE);
+    }
+
+    #[test]
+    fn reset_only_affects_active_mode() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set(ColorRole::Background, GREY);
+        palette.set_mode(ThemeMode::Dark);
+        palette.set(ColorRole::Background, BLUE);
+
+        palette.reset(ColorRole::Background);
+
+        assert_eq!(
+            background(&palette).value,
+            generated(ThemeMode::Dark, ColorRole::Background)
+        );
+        assert!(!background(&palette).customized);
+
+        palette.set_mode(ThemeMode::Light);
+        assert_eq!(background(&palette).value, GREY);
+    }
+
+    #[test]
+    fn changing_primary_clears_customizations_in_both_modes() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set(ColorRole::Background, GREY);
+        palette.set_mode(ThemeMode::Dark);
+        palette.set(ColorRole::Background, BLUE);
+
+        palette.set(ColorRole::Primary, RED);
+        assert!(!background(&palette).customized);
+
+        palette.set_mode(ThemeMode::Light);
+        let mut expected = PaletteState::new(ThemeMode::Light);
+        expected.set(ColorRole::Primary, RED);
+        assert!(!background(&palette).customized);
+        assert_eq!(
+            background(&palette).value,
+            expected.variable(ColorRole::Background).value
+        );
     }
 }
