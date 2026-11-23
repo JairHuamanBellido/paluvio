@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use gpui_kit::{
     component::{
         Theme, ThemeMode,
@@ -146,6 +148,11 @@ impl Render for MainView {
                 .update(cx, |search, cx| search.set_value("", window, cx));
             cx.notify();
         });
+        // Locking changes no color, so a re-render is enough.
+        let toggle_lock = Rc::new(cx.listener(|this, role: &ColorRole, _, cx| {
+            this.palette.toggle_locked(*role);
+            cx.notify();
+        }));
         app_layout(
             app_sidebar(
                 &self.palette,
@@ -153,6 +160,7 @@ impl Render for MainView {
                 search_bar(&self.search, cx),
                 query,
                 clear_search,
+                toggle_lock,
                 cx,
             ),
             main_content(&self.showcase, cx),

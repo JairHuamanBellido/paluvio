@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gpui_kit::{component::ThemeMode, rgb};
+use gpui_kit::{Hsla, component::ThemeMode, rgb};
 
 use super::{ColorRole, Hsv, PaletteRecipe};
 
@@ -16,6 +16,10 @@ pub struct ColorVariable {
     /// are skipped by `regenerate`, so the recipe never overwrites a user
     /// choice.
     pub customized: bool,
+    /// `true` while the user locked the variable in the active mode. Locked
+    /// variables keep their value when Primary changes. Separate from
+    /// `customized`: a locked value may be generated or hand-edited.
+    pub locked: bool,
 }
 
 /// Source of truth for every color role shown in the editor.
@@ -36,6 +40,9 @@ pub struct PaletteState {
     variables: Vec<ColorVariable>,
     /// Manual edits per mode, Primary excluded.
     overrides: HashMap<ThemeMode, HashMap<ColorRole, Hsv>>,
+    /// Locked roles per mode, with the value each one is pinned to. Primary
+    /// is never locked.
+    locks: HashMap<ThemeMode, HashMap<ColorRole, Hsv>>,
 }
 
 impl PaletteState {
@@ -54,6 +61,7 @@ impl PaletteState {
                 role,
                 value: Hsv::from_color(generated[&role]),
                 customized: false,
+                locked: false,
             })
             .collect();
         Self {
@@ -61,6 +69,7 @@ impl PaletteState {
             mode,
             variables,
             overrides: HashMap::new(),
+            locks: HashMap::new(),
         }
     }
 
@@ -100,31 +109,75 @@ impl PaletteState {
                 .entry(self.mode)
                 .or_default()
                 .insert(role, value);
+            self.sync_lock(role);
         }
+    }
+
+    /// Locks or unlocks `role` in the active mode.
+    ///
+    /// A locked role keeps its current value when Primary changes. Unlocking
+    /// only clears the flag: the value stays until the next Primary change
+    /// regenerates it. Primary is the seed and cannot be locked.
+    pub fn set_locked(&mut self, role: ColorRole, locked: bool) {
+        if role == ColorRole::Primary {
+            return;
+        }
+        let mode = self.mode;
+        let variable = self.variable_mut(role);
+        variable.locked = locked;
+        let value = variable.value;
+        let locks = self.locks.entry(mode).or_default();
+        if locked {
+            locks.insert(role, value);
+        } else {
+            locks.remove(&role);
+        }
+    }
+
+    /// Flips the lock of `role` in the active mode. See [`set_locked`](Self::set_locked).
+    pub fn toggle_locked(&mut self, role: ColorRole) {
+        let locked = self.variable(role).locked;
+        self.set_locked(role, !locked);
+    }
+
+    /// Keeps the pinned value of a locked role in step with its current value.
+    fn sync_lock(&mut self, role: ColorRole) {
+        let variable = self.variable(role);
+        if !variable.locked {
+            return;
+        }
+        let value = variable.value;
+        self.locks.entry(self.mode).or_default().insert(role, value);
     }
 
     /// Drops the manual edit of `role` in the active mode and restores its
     /// generated value. The other mode keeps its own edit.
     ///
     /// Primary has no generated value, so it goes back to `DEFAULT_PRIMARY`.
+    /// A locked role takes its generated value and stays locked.
     pub fn reset(&mut self, role: ColorRole) {
-        let variable = self.variable_mut(role);
-        variable.customized = false;
         if role == ColorRole::Primary {
+            let variable = self.variable_mut(role);
+            variable.customized = false;
             variable.value = Hsv::from_color(rgb(DEFAULT_PRIMARY).into());
             self.regenerate_from_primary();
-        } else {
-            if let Some(overrides) = self.overrides.get_mut(&self.mode) {
-                overrides.remove(&role);
-            }
-            self.regenerate();
+            return;
         }
+
+        if let Some(overrides) = self.overrides.get_mut(&self.mode) {
+            overrides.remove(&role);
+        }
+        let generated = self.generate()[&role];
+        let variable = self.variable_mut(role);
+        variable.customized = false;
+        variable.value = Hsv::from_color(generated);
+        self.sync_lock(role);
     }
 
     /// Switches the active mode and rebuilds every color for it.
     ///
-    /// No-op when the mode is unchanged. Edits made earlier in `mode` are
-    /// restored; every other role is regenerated from the recipe.
+    /// No-op when the mode is unchanged. Edits and locks made earlier in
+    /// `mode` are restored; every other role is regenerated from the recipe.
     pub fn set_mode(&mut self, mode: ThemeMode) {
         if self.mode == mode {
             return;
@@ -133,48 +186,58 @@ impl PaletteState {
         self.mode = mode;
 
         let overrides = self.overrides.get(&mode);
+        let locks = self.locks.get(&mode);
         for variable in &mut self.variables {
             if variable.role == ColorRole::Primary {
                 continue;
             }
-            match overrides.and_then(|overrides| overrides.get(&variable.role)) {
-                Some(value) => {
-                    variable.value = *value;
-                    variable.customized = true;
-                }
-                None => variable.customized = false,
+            let edit = overrides.and_then(|overrides| overrides.get(&variable.role));
+            let pinned = locks.and_then(|locks| locks.get(&variable.role));
+            variable.customized = edit.is_some();
+            variable.locked = pinned.is_some();
+            if let Some(value) = pinned.or(edit) {
+                variable.value = *value;
             }
         }
 
         self.regenerate();
     }
 
-    /// Clears every customization except Primary, in both modes, then
-    /// regenerates. Called when the seed hue changes.
+    /// Clears every customization except Primary and locked roles, in both
+    /// modes, then regenerates. Called when the seed hue changes.
     fn regenerate_from_primary(&mut self) {
-        self.overrides.clear();
+        for (mode, overrides) in &mut self.overrides {
+            let locks = self.locks.get(mode);
+            overrides.retain(|role, _| locks.is_some_and(|locks| locks.contains_key(role)));
+        }
         for variable in &mut self.variables {
-            if variable.role != ColorRole::Primary {
+            if variable.role != ColorRole::Primary && !variable.locked {
                 variable.customized = false;
             }
         }
         self.regenerate();
     }
 
-    /// Recomputes every non-customized variable for the current mode.
+    /// Recipe output for the current Primary and mode.
+    fn generate(&self) -> HashMap<ColorRole, Hsla> {
+        self.recipe.generate(
+            self.variable(ColorRole::Primary).value.to_color(),
+            self.mode,
+        )
+    }
+
+    /// Recomputes every variable that is neither customized nor locked, for
+    /// the current mode.
     ///
     /// Primary is the seed and never regenerated. Every other value is read
     /// from [`PaletteRecipe::generate`], which already resolves rule-driven
     /// roles and library-default fallbacks. To drive another role, add a rule
     /// in `recipe/light.rs` / `recipe/dark.rs`.
     fn regenerate(&mut self) {
-        let generated = self.recipe.generate(
-            self.variable(ColorRole::Primary).value.to_color(),
-            self.mode,
-        );
+        let generated = self.generate();
 
         for variable in &mut self.variables {
-            if variable.customized || variable.role == ColorRole::Primary {
+            if variable.customized || variable.locked || variable.role == ColorRole::Primary {
                 continue;
             }
             variable.value = Hsv::from_color(generated[&variable.role]);
@@ -336,5 +399,114 @@ mod tests {
             background(&palette).value,
             expected.variable(ColorRole::Background).value
         );
+    }
+
+    #[test]
+    fn locked_variable_keeps_generated_value_after_primary_change() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        let before = background(&palette).value;
+        palette.set_locked(ColorRole::Background, true);
+
+        palette.set(ColorRole::Primary, RED);
+
+        assert_eq!(background(&palette).value, before);
+        assert!(background(&palette).locked);
+        assert_ne!(
+            hover(&palette),
+            generated(ThemeMode::Light, ColorRole::ButtonPrimaryHover)
+        );
+    }
+
+    #[test]
+    fn locked_edit_survives_primary_change() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set(ColorRole::Background, GREY);
+        palette.set_locked(ColorRole::Background, true);
+
+        palette.set(ColorRole::Primary, RED);
+
+        assert_eq!(background(&palette).value, GREY);
+        assert!(background(&palette).customized);
+    }
+
+    #[test]
+    fn unlocking_keeps_value_until_next_primary_change() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set(ColorRole::Background, GREY);
+        palette.set_locked(ColorRole::Background, true);
+        palette.set(ColorRole::Primary, RED);
+
+        palette.set_locked(ColorRole::Background, false);
+        assert_eq!(background(&palette).value, GREY);
+        assert!(!background(&palette).locked);
+
+        palette.set(ColorRole::Primary, BLUE);
+        let mut expected = PaletteState::new(ThemeMode::Light);
+        expected.set(ColorRole::Primary, BLUE);
+        assert_eq!(
+            background(&palette).value,
+            expected.variable(ColorRole::Background).value
+        );
+        assert!(!background(&palette).customized);
+    }
+
+    #[test]
+    fn lock_is_per_mode_and_survives_primary_change_in_other_mode() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        let light_background = background(&palette).value;
+        palette.set_locked(ColorRole::Background, true);
+
+        palette.set_mode(ThemeMode::Dark);
+        assert!(!background(&palette).locked);
+        palette.set(ColorRole::Primary, RED);
+
+        let mut expected = PaletteState::new(ThemeMode::Dark);
+        expected.set(ColorRole::Primary, RED);
+        assert_eq!(
+            background(&palette).value,
+            expected.variable(ColorRole::Background).value
+        );
+
+        palette.set_mode(ThemeMode::Light);
+        assert!(background(&palette).locked);
+        assert_eq!(background(&palette).value, light_background);
+    }
+
+    #[test]
+    fn editing_locked_variable_updates_pinned_value() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set_locked(ColorRole::Background, true);
+        palette.set(ColorRole::Background, GREY);
+
+        palette.set_mode(ThemeMode::Dark);
+        palette.set(ColorRole::Primary, RED);
+        palette.set_mode(ThemeMode::Light);
+
+        assert_eq!(background(&palette).value, GREY);
+    }
+
+    #[test]
+    fn reset_on_locked_variable_restores_generated_and_keeps_lock() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set(ColorRole::Background, GREY);
+        palette.set_locked(ColorRole::Background, true);
+
+        palette.reset(ColorRole::Background);
+
+        assert_eq!(
+            background(&palette).value,
+            generated(ThemeMode::Light, ColorRole::Background)
+        );
+        assert!(background(&palette).locked);
+        assert!(!background(&palette).customized);
+    }
+
+    #[test]
+    fn primary_cannot_be_locked() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+
+        palette.set_locked(ColorRole::Primary, true);
+
+        assert!(!palette.variable(ColorRole::Primary).locked);
     }
 }
