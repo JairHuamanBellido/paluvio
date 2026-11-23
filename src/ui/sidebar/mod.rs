@@ -6,7 +6,10 @@ pub use search::{matches_query, search_bar};
 
 use crate::{
     theme::{COLOR_GROUP, ColorRole, PaletteState},
-    ui::{color_editor::ColorEditor, variable_swatch::variable_swatch},
+    ui::{
+        color_editor::ColorEditor,
+        variable_swatch::{ToggleLock, variable_swatch},
+    },
 };
 
 use search::empty_state;
@@ -17,6 +20,7 @@ pub fn app_sidebar(
     search: impl IntoElement,
     query: SharedString,
     on_clear_search: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    on_toggle_lock: ToggleLock,
     cx: &App,
 ) -> impl IntoElement {
     let sections = COLOR_GROUP
@@ -37,7 +41,13 @@ pub fn app_sidebar(
                     .find(|(editor_role, _)| editor_role == role)
                     .expect("registered color editor");
 
-                variable_swatch(palette.variable(*role), editor.clone(), cx).into_any_element()
+                variable_swatch(
+                    palette.variable(*role),
+                    editor.clone(),
+                    on_toggle_lock.clone(),
+                    cx,
+                )
+                .into_any_element()
             });
 
             Some(
