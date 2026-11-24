@@ -18,7 +18,7 @@ pub fn card(cx: &App) -> Div {
         .p_6()
         .rounded(CARD_RADIUS)
         .bg(cx.theme().popover)
-        .text_color(cx.theme().popover_foreground)
+        .text_color(cx.theme().foreground)
 }
 
 /// Standard card heading: bold title over a muted one-line subtitle.
