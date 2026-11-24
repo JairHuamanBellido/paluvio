@@ -1,9 +1,9 @@
 use crate::theme::{
     ColorRole,
-    palette::{Rule, Tone},
+    palette::{Rule, RuleTable, Tone},
 };
 
-pub const LIGHT: &[(ColorRole, Rule)] = &[
+pub const RULES: RuleTable = &[
     (
         ColorRole::Background,
         Rule::Anchor {

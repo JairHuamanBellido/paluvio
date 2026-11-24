@@ -1,7 +1,7 @@
 //! Palette recipe: the small set of numbers that generates theme colors.
 //!
 //! A recipe does not store colors. It stores one [`Rule`] per driven role, per
-//! theme mode (tables live in `recipe/`). Hue always comes from the seed color,
+//! theme mode (tables live in `strategy/<name>/`). Hue always comes from the seed color,
 //! so changing the seed re-tints the whole palette while keeping the
 //! light/dark feel.
 //!
@@ -11,12 +11,7 @@ use std::collections::HashMap;
 
 use gpui_kit::{Hsla, component::ThemeMode};
 
-use super::{
-    ColorRole, Hsv,
-    color::contrast_ratio,
-    gpui_bridge,
-    recipe::{DARK, LIGHT},
-};
+use super::{ColorRole, Hsv, color::contrast_ratio, gpui_bridge};
 
 /// Minimum contrast ratio for the light option of [`Rule::Contrast`] to win.
 /// 3.0 is the WCAG minimum for large text and UI components.
@@ -54,9 +49,21 @@ pub enum Rule {
     },
 }
 
-/// Rule table for one theme mode. See `recipe/light.rs` and `recipe/dark.rs`.
+/// One table of `(role, rule)` pairs, e.g. `strategy/default/light.rs`.
+pub type RuleTable = &'static [(ColorRole, Rule)];
+
+/// Rule tables for one theme mode, applied in order. A later table can
+/// override a role set by an earlier one, so a strategy can reuse the base
+/// table and swap only a few roles. See `strategy/`.
 pub struct ModeRecipe {
-    pub rules: &'static [(ColorRole, Rule)],
+    pub tables: &'static [RuleTable],
+}
+
+impl ModeRecipe {
+    /// Every rule of every table, in application order.
+    pub fn rules(&self) -> impl Iterator<Item = &(ColorRole, Rule)> {
+        self.tables.iter().flat_map(|table| table.iter())
+    }
 }
 
 /// Recipe for both modes. Light and dark are tuned independently, because a
@@ -67,15 +74,6 @@ pub struct PaletteRecipe {
     pub dark: ModeRecipe,
 }
 
-impl Default for PaletteRecipe {
-    fn default() -> Self {
-        Self {
-            light: ModeRecipe { rules: LIGHT },
-            dark: ModeRecipe { rules: DARK },
-        }
-    }
-}
-
 /// Colors produced by [`PaletteRecipe::generate`], keyed by role.
 ///
 /// Holds every role of `ColorRole::ALL`, so indexing with `palette[&role]`
@@ -84,6 +82,13 @@ impl Default for PaletteRecipe {
 pub type Palette = HashMap<ColorRole, Hsla>;
 
 impl PaletteRecipe {
+    pub fn new(light: &'static [RuleTable], dark: &'static [RuleTable]) -> Self {
+        Self {
+            light: ModeRecipe { tables: light },
+            dark: ModeRecipe { tables: dark },
+        }
+    }
+
     /// Returns the rule table that belongs to `mode`.
     pub fn mode(&self, mode: ThemeMode) -> &ModeRecipe {
         match mode {
@@ -107,7 +112,7 @@ impl PaletteRecipe {
             .map(|role| (role, gpui_bridge::default_color(role, &defaults)))
             .collect();
         out.insert(ColorRole::Primary, seed);
-        for (role, rule) in self.mode(mode).rules {
+        for (role, rule) in self.mode(mode).rules() {
             let color = match *rule {
                 Rule::Anchor {
                     saturation,
@@ -166,12 +171,16 @@ mod tests {
 
     #[test]
     fn contrast_bases_come_before_their_rule() {
-        for (name, rules) in [("LIGHT", LIGHT), ("DARK", DARK)] {
-            assert_eq!(
-                order_violations(rules),
-                [],
-                "{name}: move each base rule above the Contrast rule that reads it"
-            );
+        for strategy in crate::theme::PaletteStrategy::ALL {
+            let recipe = strategy.recipe();
+            for (name, mode) in [("light", &recipe.light), ("dark", &recipe.dark)] {
+                let rules: Vec<_> = mode.rules().copied().collect();
+                assert_eq!(
+                    order_violations(&rules),
+                    [],
+                    "{strategy:?} {name}: move each base rule above the Contrast rule that reads it"
+                );
+            }
         }
     }
 

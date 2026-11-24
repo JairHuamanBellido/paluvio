@@ -8,7 +8,10 @@ variables in the sidebar.
 
 | File | Responsibility |
 | --- | --- |
-| `src/theme/palette.rs` | `PaletteRecipe`: saturation/brightness anchors per mode. `generate(seed, mode)` turns them into colors. |
+| `src/theme/palette.rs` | Engine: `Rule`, `RuleTable`, `PaletteRecipe`. `generate(seed, mode)` turns rule tables into colors. |
+| `src/theme/strategy/mod.rs` | `PaletteStrategy` enum. `recipe()` returns its `PaletteRecipe`. |
+| `src/theme/strategy/default/` | Default strategy (tinted surfaces): `light.rs`, `dark.rs`. Base rules for every strategy. |
+| `src/theme/strategy/pure/` | Pure strategy (white/black backgrounds): `light.rs`, `dark.rs`, layered over default. |
 | `src/theme/state.rs` | `PaletteState`: one `ColorVariable` per `ColorRole`. Regenerates on seed or mode change. |
 | `src/theme/role.rs` | `ColorRole`: enum of the 139 roles. `role/label.rs` holds `name()` (UI labels), `role/key.rs` holds `key()` (export keys). |
 | `src/theme/color.rs` | `Hsv`: HSV color type and conversions. |
@@ -29,6 +32,31 @@ anchors ───┘
 
 Light and dark are tuned separately. Dark is not "light inverted": a dark
 background needs a visible tint, a light foreground needs near-zero saturation.
+
+## Strategies
+
+One folder per strategy, one file per mode:
+
+```
+src/theme/strategy/
+├── mod.rs        PaletteStrategy enum, recipe()
+├── default/      light.rs, dark.rs   tinted surfaces (base rules)
+└── pure/         light.rs, dark.rs   white/black surfaces over default
+```
+
+Each mode file exports `RULES: RuleTable`. Each strategy `mod.rs` exports
+`LIGHT` / `DARK`: the list of tables applied in order, where a later table
+overrides roles of an earlier one. Pure is
+`[default::light::RULES, pure::light::RULES]`, so it swaps only the surface
+roles.
+
+The toolbar picker (`ui/toolbar/palette_strategy.rs`, left of the theme mode
+icon) calls `PaletteState::set_strategy`. Like a Primary change, it clears
+every unlocked edit in both modes and regenerates. The choice is saved to
+`<config dir>/paluvio/palette-strategy`.
+
+To add a strategy: create `strategy/<name>/{mod,light,dark}.rs`, add a
+variant to `PaletteStrategy`, and a `Select*` action in `palette_strategy.rs`.
 
 ## Data flow
 
