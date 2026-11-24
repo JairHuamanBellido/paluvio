@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use gpui_kit::{Hsla, component::ThemeMode, rgb};
 
-use super::{ColorRole, Hsv, PaletteRecipe};
+use super::{ColorRole, Hsv, PaletteRecipe, PaletteStrategy};
 
 /// Initial seed color (`#8CC671`).
 const DEFAULT_PRIMARY: u32 = 0x8CC671;
@@ -35,6 +35,7 @@ pub struct ColorVariable {
 ///
 /// [`set_mode`]: PaletteState::set_mode
 pub struct PaletteState {
+    strategy: PaletteStrategy,
     recipe: PaletteRecipe,
     mode: ThemeMode,
     variables: Vec<ColorVariable>,
@@ -51,7 +52,8 @@ impl PaletteState {
     /// Primary starts as `DEFAULT_PRIMARY`. Roles with a recipe rule are
     /// generated. Every other role starts from the library defaults of `mode`.
     pub fn new(mode: ThemeMode) -> Self {
-        let recipe = PaletteRecipe::default();
+        let strategy = PaletteStrategy::default();
+        let recipe = strategy.recipe();
 
         let primary = Hsv::from_color(rgb(DEFAULT_PRIMARY).into());
         let generated = recipe.generate(primary.to_color(), mode);
@@ -65,6 +67,7 @@ impl PaletteState {
             })
             .collect();
         Self {
+            strategy,
             recipe,
             mode,
             variables,
@@ -174,6 +177,24 @@ impl PaletteState {
         self.sync_lock(role);
     }
 
+    /// Active palette strategy.
+    pub fn strategy(&self) -> PaletteStrategy {
+        self.strategy
+    }
+
+    /// Switches the generator strategy and regenerates both modes.
+    ///
+    /// No-op when unchanged. Like a Primary change, it clears every manual
+    /// edit except locked roles, so the new style shows everywhere it can.
+    pub fn set_strategy(&mut self, strategy: PaletteStrategy) {
+        if self.strategy == strategy {
+            return;
+        }
+        self.strategy = strategy;
+        self.recipe = strategy.recipe();
+        self.regenerate_from_primary();
+    }
+
     /// Switches the active mode and rebuilds every color for it.
     ///
     /// No-op when the mode is unchanged. Edits and locks made earlier in
@@ -232,7 +253,7 @@ impl PaletteState {
     /// Primary is the seed and never regenerated. Every other value is read
     /// from [`PaletteRecipe::generate`], which already resolves rule-driven
     /// roles and library-default fallbacks. To drive another role, add a rule
-    /// in `recipe/light.rs` / `recipe/dark.rs`.
+    /// in `strategy/<name>/light.rs` / `dark.rs`.
     fn regenerate(&mut self) {
         let generated = self.generate();
 
@@ -499,6 +520,58 @@ mod tests {
         );
         assert!(background(&palette).locked);
         assert!(!background(&palette).customized);
+    }
+
+    fn generated_with(strategy: PaletteStrategy, mode: ThemeMode, role: ColorRole) -> Hsv {
+        let mut palette = PaletteState::new(mode);
+        palette.set_strategy(strategy);
+        palette.variable(role).value
+    }
+
+    #[test]
+    fn switching_strategy_regenerates_background() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        let tinted = background(&palette).value;
+
+        palette.set_strategy(PaletteStrategy::Pure);
+
+        assert_eq!(palette.strategy(), PaletteStrategy::Pure);
+        assert_ne!(background(&palette).value, tinted);
+        assert_eq!(background(&palette).value.brightness, 1.0);
+        assert_eq!(background(&palette).value.saturation, 0.0);
+    }
+
+    #[test]
+    fn switching_strategy_keeps_primary_and_applies_to_other_mode() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set(ColorRole::Primary, RED);
+        palette.set_strategy(PaletteStrategy::Pure);
+
+        palette.set_mode(ThemeMode::Dark);
+
+        assert_eq!(palette.variable(ColorRole::Primary).value, RED);
+        assert_eq!(background(&palette).value.brightness, 0.0);
+    }
+
+    #[test]
+    fn switching_strategy_clears_edits_but_keeps_locks() {
+        let mut palette = PaletteState::new(ThemeMode::Light);
+        palette.set(ColorRole::Background, GREY);
+        palette.set(ColorRole::Popover, BLUE);
+        palette.set_locked(ColorRole::Popover, true);
+
+        palette.set_strategy(PaletteStrategy::Pure);
+
+        assert!(!background(&palette).customized);
+        assert_eq!(
+            background(&palette).value,
+            generated_with(
+                PaletteStrategy::Pure,
+                ThemeMode::Light,
+                ColorRole::Background
+            )
+        );
+        assert_eq!(palette.variable(ColorRole::Popover).value, BLUE);
     }
 
     #[test]

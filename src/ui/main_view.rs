@@ -19,7 +19,10 @@ use crate::{
         header::Header,
         layout::app_layout,
         main_content::{Showcase, main_content},
-        toolbar::{ThemeModeSelector, ThemePreference, toolbar},
+        toolbar::{
+            PaletteStrategyChanged, PaletteStrategySelector, ThemeModeSelector, ThemePreference,
+            toolbar,
+        },
     },
 };
 
@@ -28,6 +31,7 @@ pub struct MainView {
     editors: Vec<(ColorRole, Entity<ColorEditor>)>,
     _subscriptions: Vec<Subscription>,
     theme_mode: Entity<ThemeModeSelector>,
+    palette_strategy: Entity<PaletteStrategySelector>,
     showcase: Entity<Showcase>,
     search: Entity<InputState>,
 }
@@ -37,7 +41,9 @@ impl MainView {
         let saved_preference = preferences::load_theme_preference();
         apply_theme_preference(saved_preference, window, cx);
 
-        let palette = PaletteState::new(Theme::global(cx).mode);
+        let saved_strategy = preferences::load_palette_strategy();
+        let mut palette = PaletteState::new(Theme::global(cx).mode);
+        palette.set_strategy(saved_strategy);
         theme::apply(&palette, cx);
 
         let mut editors: Vec<(ColorRole, Entity<ColorEditor>)> = Vec::new();
@@ -84,6 +90,22 @@ impl MainView {
             }),
         );
 
+        let palette_strategy: Entity<PaletteStrategySelector> =
+            cx.new(|cx| PaletteStrategySelector::new(palette.strategy(), cx));
+
+        subscriptions.push(cx.subscribe_in(
+            &palette_strategy,
+            window,
+            |this, _, event: &PaletteStrategyChanged, window, cx| {
+                let strategy = event.0;
+                this.palette.set_strategy(strategy);
+                this.refresh(window, cx);
+                if let Err(error) = preferences::save_palette_strategy(strategy) {
+                    eprintln!("failed to save palette strategy: {error}")
+                }
+            },
+        ));
+
         let showcase = cx.new(|cx| Showcase::new(window, cx));
 
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search a color"));
@@ -100,6 +122,7 @@ impl MainView {
             editors,
             _subscriptions: subscriptions,
             theme_mode,
+            palette_strategy,
         }
     }
 
@@ -136,6 +159,7 @@ impl Render for MainView {
             .find(|(role, _)| *role == ColorRole::Primary)
             .expect("registered primary editor");
         let header = Header::new(toolbar(
+            &self.palette_strategy,
             &self.theme_mode,
             self.palette.variable(ColorRole::Primary).value,
             primary_editor,
