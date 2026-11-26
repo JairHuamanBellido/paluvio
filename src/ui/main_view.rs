@@ -18,10 +18,10 @@ use crate::{
     ui::{
         header::Header,
         layout::app_layout,
-        main_content::{Showcase, main_content},
+        main_content::{Containers, ContentTab, main_content},
         toolbar::{
             PaletteStrategyChanged, PaletteStrategySelector, ThemeModeSelector, ThemePreference,
-            toolbar,
+            content_tabs, toolbar,
         },
     },
 };
@@ -32,7 +32,8 @@ pub struct MainView {
     _subscriptions: Vec<Subscription>,
     theme_mode: Entity<ThemeModeSelector>,
     palette_strategy: Entity<PaletteStrategySelector>,
-    showcase: Entity<Showcase>,
+    containers: Containers,
+    active_tab: ContentTab,
     search: Entity<InputState>,
 }
 
@@ -106,7 +107,7 @@ impl MainView {
             },
         ));
 
-        let showcase = cx.new(|cx| Showcase::new(window, cx));
+        let containers = Containers::new(window, cx);
 
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search a color"));
         subscriptions.push(cx.subscribe(&search, |_, _, event, cx| {
@@ -117,7 +118,8 @@ impl MainView {
 
         Self {
             palette,
-            showcase,
+            containers,
+            active_tab: ContentTab::default(),
             search,
             editors,
             _subscriptions: subscriptions,
@@ -158,13 +160,25 @@ impl Render for MainView {
             .iter()
             .find(|(role, _)| *role == ColorRole::Primary)
             .expect("registered primary editor");
-        let header = Header::new(toolbar(
-            &self.palette_strategy,
-            &self.theme_mode,
-            self.palette.variable(ColorRole::Primary).value,
-            primary_editor,
-            cx,
-        ));
+        let select_tab = cx.listener(|this, tab: &ContentTab, _, cx| {
+            if this.active_tab != *tab {
+                this.active_tab = *tab;
+                cx.notify();
+            }
+        });
+        let tabs = content_tabs(self.active_tab, move |tab, window, cx| {
+            select_tab(&tab, window, cx)
+        });
+        let header = Header::new(
+            tabs,
+            toolbar(
+                &self.palette_strategy,
+                &self.theme_mode,
+                self.palette.variable(ColorRole::Primary).value,
+                primary_editor,
+                cx,
+            ),
+        );
         let query = self.search.read(cx).value();
         let clear_search = cx.listener(|this, _: &ClickEvent, window, cx| {
             // `set_value` emits no change event, so re-render by hand.
@@ -187,7 +201,7 @@ impl Render for MainView {
                 toggle_lock,
                 cx,
             ),
-            main_content(&self.showcase, cx),
+            main_content(self.containers.view(self.active_tab), cx),
             header,
             cx,
         )

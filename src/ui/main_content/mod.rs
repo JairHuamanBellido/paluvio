@@ -1,12 +1,14 @@
+mod containers;
 mod showcase;
 
 use gpui_kit::{component::ActiveTheme, *};
 
-pub use showcase::Showcase;
+pub use containers::{Containers, ContentTab};
 
-pub fn main_content(showcase: &Entity<Showcase>, cx: &App) -> impl IntoElement {
+/// Main area: scrolls and frames whichever container the active tab shows.
+pub fn main_content(container: AnyView, cx: &App) -> impl IntoElement {
     div()
-        .id("palette-preview")
+        .id("main-content")
         .flex_1()
         .min_w_0()
         .min_h_0()
@@ -16,5 +18,5 @@ pub fn main_content(showcase: &Entity<Showcase>, cx: &App) -> impl IntoElement {
         .rounded_tl(px(24.))
         .rounded_bl(px(24.))
         .p_8()
-        .child(showcase.clone())
+        .child(container)
 }
