@@ -13,12 +13,15 @@ static LOGO: LazyLock<Arc<Image>> = LazyLock::new(|| {
 
 #[derive(IntoElement)]
 pub struct Header {
+    center: AnyElement,
     toolbar: AnyElement,
 }
 
 impl Header {
-    pub fn new(toolbar: impl IntoElement) -> Self {
+    /// `center` sits in the middle of the title bar, `toolbar` on the right.
+    pub fn new(center: impl IntoElement, toolbar: impl IntoElement) -> Self {
         Self {
+            center: center.into_any_element(),
             toolbar: toolbar.into_any_element(),
         }
     }
@@ -41,8 +44,11 @@ impl RenderOnce for Header {
             .justify_between()
             .items_center()
             .pr_10()
+            // Left and right slots share the free space equally, so the center
+            // slot stays centered whatever their widths.
             .child(
                 div()
+                    .flex_1()
                     .h_full()
                     .flex()
                     .items_center()
@@ -58,6 +64,7 @@ impl RenderOnce for Header {
                             .child("Paluvio"),
                     ),
             )
-            .child(self.toolbar)
+            .child(div().flex_none().child(self.center))
+            .child(div().flex_1().flex().justify_end().child(self.toolbar))
     }
 }

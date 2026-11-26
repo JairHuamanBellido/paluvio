@@ -1,8 +1,10 @@
 use gpui_kit::{component::ActiveTheme, *};
+mod content_tabs;
 mod palette_strategy;
 mod primary_color;
 mod theme_mode;
 
+pub use content_tabs::content_tabs;
 pub use palette_strategy::{PaletteStrategyChanged, PaletteStrategySelector};
 pub use theme_mode::{ThemeModeSelector, ThemePreference};
 
