@@ -201,7 +201,11 @@ impl Render for MainView {
                 toggle_lock,
                 cx,
             ),
-            main_content(self.containers.view(self.active_tab), cx),
+            main_content(
+                self.containers.view(self.active_tab),
+                self.active_tab.padded(),
+                cx,
+            ),
             header,
             cx,
         )
