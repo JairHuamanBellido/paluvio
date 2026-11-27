@@ -39,6 +39,12 @@ impl ContentTab {
         }
     }
 
+    /// Whether the main area pads this tab's container. The auth screen
+    /// fills the whole area instead.
+    pub fn padded(self) -> bool {
+        !matches!(self, ContentTab::Auth)
+    }
+
     /// Position in [`ContentTab::ALL`].
     pub fn index(self) -> usize {
         Self::ALL
@@ -58,7 +64,7 @@ impl Containers {
     pub fn new(window: &mut Window, cx: &mut App) -> Self {
         Self {
             cards: cx.new(|cx| Showcase::new(window, cx)),
-            auth: cx.new(|_| AuthContainer),
+            auth: cx.new(|cx| AuthContainer::new(window, cx)),
         }
     }
 
